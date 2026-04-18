@@ -1,0 +1,6 @@
+name: DualStaminaPlugin
+author: Swartzz
+version: 1.0.0
+main: com.dualstamina.DualStaminaPlugin
+api-version: '1.21'
+description: Hardcore dual-stamina system with Leg and Arm resource bars.
