@@ -1,0 +1,32 @@
+# ─────────────────────────────────────────────
+#  DualStamina Configuration
+# ─────────────────────────────────────────────
+
+drain:
+  leg:
+    # Stamina drained per tick while sprinting
+    sprint-per-tick: 0.35
+    # Stamina drained on a normal jump
+    jump: 8.0
+    # Multiplier applied to jump cost when sneaking (0.5 = 50% cheaper)
+    jump-sneak-multiplier: 0.5
+    # Stamina drained per HP of fall damage taken
+    fall-per-hp: 2.0
+
+  arm:
+    # Stamina drained per weapon swing (sword / axe / mace)
+    swing: 10.0
+    # Stamina drained when firing a bow
+    bow: 15.0
+    # Stamina drained when taking a hit while blocking
+    shield-hit: 12.0
+    # Stamina drained per block-damage event while mining
+    mine: 1.5
+
+regen:
+  # Milliseconds of inactivity before regeneration starts (default: 1000 = 1s)
+  delay-ms: 1000
+  # Stamina restored per tick under normal conditions
+  normal-per-tick: 0.4
+  # Stamina restored per tick while sneaking (should be >= normal)
+  sneak-per-tick: 0.8

@@ -2,6 +2,7 @@ package com.dualstamina.task;
 
 import com.cryptomorin.xseries.XPotion;
 import com.dualstamina.DualStaminaPlugin;
+import com.dualstamina.config.ConfigManager;
 import com.dualstamina.data.PlayerStamina;
 import com.dualstamina.manager.StaminaManager;
 import net.md_5.bungee.api.ChatMessageType;
@@ -13,24 +14,22 @@ import org.bukkit.scheduler.BukkitRunnable;
 
 public class StaminaTask extends BukkitRunnable {
 
-    private static final double SPRINT_DRAIN_PER_TICK = 0.35;
-    private static final double REGEN_PER_TICK_NORMAL = 0.4;
-    private static final double REGEN_PER_TICK_SNEAK = 0.8;
-    private static final long REGEN_DELAY_MS = 1000L;
     private static final double LEG_EXHAUSTION_THRESHOLD = 0.0;
-    private static final double LEG_RECOVERY_THRESHOLD = 25.0;
+    private static final double LEG_RECOVERY_THRESHOLD   = 25.0;
     private static final double ARM_EXHAUSTION_THRESHOLD = 0.0;
-    private static final double ARM_RECOVERY_THRESHOLD = 25.0;
-    private static final int BARS = 10;
-    private static final double CRITICAL_PERCENT = 10.0;
+    private static final double ARM_RECOVERY_THRESHOLD   = 25.0;
+    private static final int    BARS                     = 10;
+    private static final double CRITICAL_PERCENT         = 10.0;
 
     private final DualStaminaPlugin plugin;
-    private final StaminaManager staminaManager;
+    private final StaminaManager    staminaManager;
+    private final ConfigManager     configManager;
     private int tickCounter = 0;
 
     public StaminaTask(DualStaminaPlugin plugin) {
-        this.plugin = plugin;
+        this.plugin         = plugin;
         this.staminaManager = plugin.getStaminaManager();
+        this.configManager  = plugin.getConfigManager();
     }
 
     @Override
@@ -38,17 +37,13 @@ public class StaminaTask extends BukkitRunnable {
         tickCounter++;
 
         for (Player player : plugin.getServer().getOnlinePlayers()) {
-            PlayerStamina stamina = staminaManager.getStamina(player.getUniqueId());
-            int foodLevel = player.getFoodLevel();
-            double effectiveMax = stamina.getEffectiveMax(foodLevel);
+            PlayerStamina stamina  = staminaManager.getStamina(player.getUniqueId());
+            int           foodLevel   = player.getFoodLevel();
+            double        effectiveMax = stamina.getEffectiveMax(foodLevel);
 
             if (foodLevel <= 6) {
-                if (stamina.getLegStamina() > 50.0) {
-                    stamina.setLegStamina(50.0);
-                }
-                if (stamina.getArmStamina() > 50.0) {
-                    stamina.setArmStamina(50.0);
-                }
+                if (stamina.getLegStamina() > 50.0) stamina.setLegStamina(50.0);
+                if (stamina.getArmStamina() > 50.0) stamina.setArmStamina(50.0);
             }
 
             if (!stamina.isAdrenalineActive()) {
@@ -70,7 +65,7 @@ public class StaminaTask extends BukkitRunnable {
             if (stamina.getLegStamina() <= 0) {
                 player.setSprinting(false);
             } else {
-                stamina.drainLeg(SPRINT_DRAIN_PER_TICK, foodLevel);
+                stamina.drainLeg(configManager.getSprintDrainPerTick(), foodLevel);
             }
         }
     }
@@ -87,9 +82,7 @@ public class StaminaTask extends BukkitRunnable {
             if (stamina.getLegStamina() >= LEG_RECOVERY_THRESHOLD) {
                 stamina.setLegExhausted(false);
                 PotionEffectType slownessType = getEffectType("SLOWNESS");
-                if (slownessType != null) {
-                    player.removePotionEffect(slownessType);
-                }
+                if (slownessType != null) player.removePotionEffect(slownessType);
             }
         }
     }
@@ -100,10 +93,8 @@ public class StaminaTask extends BukkitRunnable {
             applyMiningFatigueIII(player);
         }
 
-        if (stamina.isArmExhausted()) {
-            if (stamina.getArmStamina() >= ARM_RECOVERY_THRESHOLD) {
-                stamina.setArmExhausted(false);
-            }
+        if (stamina.isArmExhausted() && stamina.getArmStamina() >= ARM_RECOVERY_THRESHOLD) {
+            stamina.setArmExhausted(false);
         }
     }
 
@@ -127,16 +118,19 @@ public class StaminaTask extends BukkitRunnable {
     }
 
     private void handleRegen(Player player, PlayerStamina stamina, int foodLevel, double effectiveMax) {
-        long now = System.currentTimeMillis();
-        double regenAmount = player.isSneaking() ? REGEN_PER_TICK_SNEAK : REGEN_PER_TICK_NORMAL;
+        long   now         = System.currentTimeMillis();
+        double regenAmount = player.isSneaking()
+                ? configManager.getRegenSneakPerTick()
+                : configManager.getRegenNormalPerTick();
+        long regenDelay = configManager.getRegenDelayMs();
 
-        if (now - stamina.getLastLegActivity() >= REGEN_DELAY_MS) {
+        if (now - stamina.getLastLegActivity() >= regenDelay) {
             if (stamina.getLegStamina() < effectiveMax) {
                 stamina.regenLeg(regenAmount, foodLevel);
             }
         }
 
-        if (now - stamina.getLastArmActivity() >= REGEN_DELAY_MS) {
+        if (now - stamina.getLastArmActivity() >= regenDelay) {
             if (stamina.getArmStamina() < effectiveMax) {
                 stamina.regenArm(regenAmount, foodLevel);
             }
@@ -145,15 +139,11 @@ public class StaminaTask extends BukkitRunnable {
 
     private void updateHUD(Player player, PlayerStamina stamina, int foodLevel) {
         boolean hungerCapped = foodLevel <= 6;
-
         String legBarColor = getLegBarColor(stamina, hungerCapped);
         String armBarColor = getArmBarColor(stamina, hungerCapped);
-
         String legBar = buildBar(stamina.getLegStamina(), legBarColor);
         String armBar = buildBar(stamina.getArmStamina(), armBarColor);
-
         String message = "§fL: [" + legBar + "§f] §7| §fA: [" + armBar + "§f]";
-
         player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(message));
     }
 
@@ -172,13 +162,9 @@ public class StaminaTask extends BukkitRunnable {
         filled = Math.max(0, Math.min(BARS, filled));
         StringBuilder sb = new StringBuilder();
         sb.append(filledColor);
-        for (int i = 0; i < filled; i++) {
-            sb.append("|");
-        }
+        for (int i = 0; i < filled; i++) sb.append("|");
         sb.append("§8");
-        for (int i = filled; i < BARS; i++) {
-            sb.append("|");
-        }
+        for (int i = filled; i < BARS; i++) sb.append("|");
         return sb.toString();
     }
 }

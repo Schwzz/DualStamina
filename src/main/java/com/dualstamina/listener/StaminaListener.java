@@ -3,6 +3,7 @@ package com.dualstamina.listener;
 import com.cryptomorin.xseries.XMaterial;
 import com.cryptomorin.xseries.XPotion;
 import com.dualstamina.DualStaminaPlugin;
+import com.dualstamina.config.ConfigManager;
 import com.dualstamina.data.PlayerStamina;
 import com.dualstamina.manager.StaminaManager;
 import org.bukkit.Material;
@@ -28,21 +29,17 @@ import java.util.Optional;
 
 public class StaminaListener implements Listener {
 
-    private static final double LEG_JUMP_DRAIN = 8.0;
-    private static final double ARM_MINE_DRAIN = 1.5;
-    private static final double LEG_FALL_DRAIN_PER_HP = 2.0;
-    private static final double ARM_SWING_DRAIN = 10.0;
-    private static final double ARM_BOW_DRAIN = 15.0;
-    private static final double ARM_SHIELD_HIT_DRAIN = 12.0;
-    private static final int SHIELD_COOLDOWN_TICKS = 100;
-    private static final long ADRENALINE_DURATION_MS = 10_000L;
+    private static final int    SHIELD_COOLDOWN_TICKS  = 100;
+    private static final long   ADRENALINE_DURATION_MS = 10_000L;
 
     private final DualStaminaPlugin plugin;
     private final StaminaManager staminaManager;
+    private final ConfigManager configManager;
 
     public StaminaListener(DualStaminaPlugin plugin) {
         this.plugin = plugin;
         this.staminaManager = plugin.getStaminaManager();
+        this.configManager  = plugin.getConfigManager();
     }
 
     @EventHandler
@@ -62,7 +59,10 @@ public class StaminaListener implements Listener {
             double deltaY = event.getTo().getY() - event.getFrom().getY();
             if (deltaY > 0.4) {
                 PlayerStamina stamina = staminaManager.getStamina(player.getUniqueId());
-                double cost = player.isSneaking() ? LEG_JUMP_DRAIN * 0.5 : LEG_JUMP_DRAIN;
+                double baseCost = configManager.getJumpDrain();
+                double cost = player.isSneaking()
+                        ? baseCost * configManager.getJumpSneakMultiplier()
+                        : baseCost;
                 stamina.drainLeg(cost, player.getFoodLevel());
             }
         }
@@ -72,7 +72,7 @@ public class StaminaListener implements Listener {
     public void onBlockDamage(BlockDamageEvent event) {
         Player player = event.getPlayer();
         PlayerStamina stamina = staminaManager.getStamina(player.getUniqueId());
-        stamina.drainArm(ARM_MINE_DRAIN, player.getFoodLevel());
+        stamina.drainArm(configManager.getMineDrain(), player.getFoodLevel());
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -82,7 +82,7 @@ public class StaminaListener implements Listener {
         double damage = event.getFinalDamage();
         if (damage <= 0) return;
         PlayerStamina stamina = staminaManager.getStamina(player.getUniqueId());
-        stamina.drainLeg(damage * LEG_FALL_DRAIN_PER_HP, player.getFoodLevel());
+        stamina.drainLeg(damage * configManager.getFallDrainPerHp(), player.getFoodLevel());
     }
 
     @EventHandler
@@ -95,7 +95,7 @@ public class StaminaListener implements Listener {
         String name = xMat.name();
         if (name.endsWith("_SWORD") || name.endsWith("_AXE") || name.equals("MACE")) {
             PlayerStamina stamina = staminaManager.getStamina(player.getUniqueId());
-            stamina.drainArm(ARM_SWING_DRAIN, player.getFoodLevel());
+            stamina.drainArm(configManager.getSwingDrain(), player.getFoodLevel());
         }
     }
 
@@ -103,7 +103,7 @@ public class StaminaListener implements Listener {
     public void onBowShoot(EntityShootBowEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
         PlayerStamina stamina = staminaManager.getStamina(player.getUniqueId());
-        stamina.drainArm(ARM_BOW_DRAIN, player.getFoodLevel());
+        stamina.drainArm(configManager.getBowDrain(), player.getFoodLevel());
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -112,7 +112,7 @@ public class StaminaListener implements Listener {
         if (!defender.isBlocking()) return;
 
         PlayerStamina stamina = staminaManager.getStamina(defender.getUniqueId());
-        stamina.drainArm(ARM_SHIELD_HIT_DRAIN, defender.getFoodLevel());
+        stamina.drainArm(configManager.getShieldHitDrain(), defender.getFoodLevel());
 
         if (stamina.getArmStamina() <= 0) {
             Optional<Material> shieldMat = XMaterial.matchXMaterial("SHIELD").map(XMaterial::parseMaterial);

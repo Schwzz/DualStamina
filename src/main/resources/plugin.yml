@@ -4,3 +4,14 @@ version: 1.0.0
 main: com.dualstamina.DualStaminaPlugin
 api-version: '1.21'
 description: Hardcore dual-stamina system with Leg and Arm resource bars.
+
+permissions:
+  dualstamina.admin:
+    description: Access to all /stamina admin commands
+    default: op
+
+commands:
+  stamina:
+    description: Manage the DualStamina plugin
+    usage: /stamina <reload|setdrain|info>
+    permission: dualstamina.admin
